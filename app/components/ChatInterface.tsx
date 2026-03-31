@@ -9,6 +9,7 @@ import {
   type Status,
   STATUS_LABELS,
 } from "../lib/pension-engine";
+import { DOMAINS, type DomainId } from "../lib/domains";
 
 type Message = {
   role: "user" | "assistant";
@@ -30,7 +31,9 @@ const DEMO_STEPS: { type: "chip" | "type" | "send" | "ai" | "btn" | "result" | "
   { type: "ai", value: "优化建议：\n\n1. 追纳学生期间 — 补缴4年约86万円，月领取额可增加约5,880円\n2. 继续工作到60岁 — 再缴28年厚生年金，合计可达约12万円/月\n3. 考虑延后领取 — 70岁开始领可增加42%", delay: 0 },
 ];
 
-export default function ChatInterface() {
+export default function ChatInterface({ domainId = "pension" }: { domainId?: DomainId }) {
+  const domain = DOMAINS[domainId];
+  const isStructured = domain.chatMode === "structured";
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
@@ -191,6 +194,30 @@ export default function ChatInterface() {
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
 
+    // ─── Freeform mode (tax, etc.) ───
+    if (!isStructured) {
+      setPhase("parsing");
+      try {
+        const apiMessages = newMessages.slice(-10);
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: apiMessages, domain: domainId }),
+        });
+        const data = await res.json();
+        if (data.error) {
+          setMessages([...newMessages, { role: "assistant", content: "抱歉，出错了，请重试。" }]);
+        } else {
+          setMessages([...newMessages, { role: "assistant", content: data.response }]);
+        }
+      } catch {
+        setMessages([...newMessages, { role: "assistant", content: "网络错误，请重试。" }]);
+      }
+      setPhase("idle");
+      return;
+    }
+
+    // ─── Structured mode (pension) ───
     if (phase === "confirming") {
       if (/^(好|是|对|确认|没问题|ok|yes|y|可以|正确|嗯)$/i.test(text) && parsedData) {
         doCalculate(parsedData, newMessages);
@@ -215,7 +242,7 @@ export default function ChatInterface() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: apiMessages, phase: "parse" }),
+        body: JSON.stringify({ messages: apiMessages, phase: "parse", domain: domainId }),
       });
       const parsed = await res.json();
 
@@ -239,7 +266,6 @@ export default function ChatInterface() {
         setMessages([...newMessages, { role: "assistant", content: buildConfirmSummary(fullData) }]);
         setPhase("confirming");
       } else {
-        // Never show raw JSON to user
         let reply = parsed.response || "请再补充一些信息。";
         if (reply.includes('"complete"') || reply.includes('"data"')) {
           reply = reply.replace(/\{[\s\S]*\}/g, "").trim() || "请再补充一些信息。";
@@ -358,16 +384,7 @@ export default function ChatInterface() {
   const showWelcome = messages.length === 0 && phase === "idle" && !demoActive;
   const isBusy = phase === "parsing" || phase === "calculating" || phase === "suggesting";
 
-  const CHIPS = [
-    "来日本读过书",
-    "在公司上班",
-    "辞职/无职业",
-    "全职主妇",
-    "休过产假育休",
-    "有免除期间",
-    "打算提前领取",
-    "想延后到70岁",
-  ];
+  const CHIPS = domain.chips;
 
   // ─── Demo view ───
   if (demoActive) {
@@ -475,14 +492,18 @@ export default function ChatInterface() {
         {/* Welcome */}
         {showWelcome && (
           <div className="flex flex-col items-center justify-center h-full px-2">
-            <p className="text-sm text-gray-400 mb-1">告诉我你在日本的经历</p>
-            <p className="text-xs text-gray-300 mb-5">我来算你的养老金</p>
+            <p className="text-sm text-gray-400 mb-1">{domain.welcomeTitle}</p>
+            <p className="text-xs text-gray-300 mb-5">{domain.welcomeSubtitle}</p>
             <div className="flex flex-wrap justify-center gap-2 max-w-[320px]">
               {CHIPS.map((chip) => (
                 <button
                   key={chip}
                   onClick={() => {
-                    setInput((prev) => (prev ? prev + "，" + chip : chip));
+                    if (isStructured) {
+                      setInput((prev) => (prev ? prev + "，" + chip : chip));
+                    } else {
+                      setInput(chip);
+                    }
                     textareaRef.current?.focus();
                   }}
                   className="px-3 py-1.5 text-xs text-gray-400 border border-gray-200 rounded-full hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50/50 transition-all"
@@ -491,13 +512,15 @@ export default function ChatInterface() {
                 </button>
               ))}
             </div>
-            <button
-              onClick={runDemo}
-              className="mt-6 px-5 py-2 text-sm text-blue-600 border border-blue-200 rounded-full hover:bg-blue-50 transition-all flex items-center gap-1.5"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>
-              看演示
-            </button>
+            {isStructured && (
+              <button
+                onClick={runDemo}
+                className="mt-6 px-5 py-2 text-sm text-blue-600 border border-blue-200 rounded-full hover:bg-blue-50 transition-all flex items-center gap-1.5"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                看演示
+              </button>
+            )}
           </div>
         )}
 
@@ -527,8 +550,8 @@ export default function ChatInterface() {
           </div>
         )}
 
-        {/* Confirm actions */}
-        {phase === "confirming" && (
+        {/* Confirm actions (structured only) */}
+        {isStructured && phase === "confirming" && (
           <div className="flex gap-2 justify-center">
             <button
               onClick={() => handleSend("确认")}
@@ -577,7 +600,7 @@ export default function ChatInterface() {
               rows={1}
               placeholder={
                 showWelcome
-                  ? "我32岁，22岁来日本读书，26岁开始工作，年收450万..."
+                  ? domain.placeholder
                   : phase === "done"
                     ? "还有什么想问的..."
                     : "继续说..."

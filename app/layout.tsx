@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "日本年金计算器 | 在日华人养老金模拟",
+  title: "在日FP助手 | 年金・税金AI相谈",
   description:
-    "输入你的年龄、来日时间、年收入，立即算出65岁后每月能领多少养老金。国民年金+厚生年金，2026年最新数据。",
+    "年金计算、税务咨询、节税对策。FP2級監修，面向在日华人的AI理财助手。2026年最新数据。",
   openGraph: {
-    title: "日本年金计算器 | 在日华人养老金模拟",
-    description: "输入3个数字，秒算你的日本养老金",
+    title: "在日FP助手 | 年金・税金AI相谈",
+    description: "AI帮你算年金、省税金 — FP2級監修",
     type: "website",
   },
 };
