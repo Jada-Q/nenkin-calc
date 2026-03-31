@@ -10,14 +10,16 @@ const KOUSEI_RATE = 0.005481;
 const KOUSEI_PREMIUM_RATE = 0.0915;
 const MIN_MONTHS = 120;
 
-type Status = "student" | "employed" | "unemployed" | "dependent" | "exempt";
+type Status = "student" | "employed" | "unemployed" | "dependent" | "exempt" | "maternity" | "sickleave";
 
 const STATUS_LABELS: Record<Status, { label: string; desc: string }> = {
-  employed: { label: "上班（厚生年金）", desc: "公司员工，公司帮交" },
+  employed: { label: "上班", desc: "公司员工，厚生年金，公司付一半" },
   student: { label: "留学/读书", desc: "可申请学生特例免缴" },
   unemployed: { label: "无职业", desc: "应自缴国民年金" },
-  dependent: { label: "家庭主妇/主夫", desc: "配偶交厚生年金，自己不用交" },
-  exempt: { label: "免除/猶予期间", desc: "申请了免除，领取额减半" },
+  dependent: { label: "主妇/主夫", desc: "配偶交厚生年金，自己不用交" },
+  maternity: { label: "产假/育休", desc: "保费全免，但年金按休假前工资照算" },
+  sickleave: { label: "病休/休职", desc: "继续缴纳厚生年金，按休假前工资算" },
+  exempt: { label: "免除/猶予", desc: "申请了免除，领取额减半" },
 };
 
 type Period = {
@@ -72,7 +74,7 @@ function calculate(periods: Period[], currentAge: number): Result {
         break;
       case "student":
         // 学生特例：算入资格期间，但领取额为0（除非后来追纳）
-        nationalMonths = 0; // 领取计算不算入
+        nationalMonths = 0;
         paid = 0;
         break;
       case "unemployed":
@@ -85,8 +87,22 @@ function calculate(periods: Period[], currentAge: number): Result {
         nationalMonths = months;
         paid = 0;
         break;
+      case "maternity":
+        // 産休/育休：保费全免，但厚生年金记录照算（按休假前工资）
+        nationalMonths = months;
+        kouseiMonths = months;
+        kouseiIncome = p.annualIncome;
+        paid = 0; // 保费全免（公司和个人都免）
+        break;
+      case "sickleave":
+        // 病休/休职：继续缴纳厚生年金（按休假前标准報酬月額）
+        nationalMonths = months;
+        kouseiMonths = months;
+        kouseiIncome = p.annualIncome;
+        paid = Math.round((p.annualIncome / 12) * KOUSEI_PREMIUM_RATE) * months;
+        break;
       case "exempt":
-        // 全额免除：算入资格期间，领取额算一半
+        // 全額免除：算入资格期间，领取额算一半
         nationalMonths = Math.round(months / 2);
         paid = 0;
         break;
@@ -269,7 +285,9 @@ export default function Home() {
                           updatePeriod(p.id, {
                             status: key,
                             annualIncome:
-                              key === "employed" ? 3500000 : 0,
+                              key === "employed" || key === "maternity" || key === "sickleave"
+                                ? p.annualIncome || 3500000
+                                : 0,
                           })
                         }
                         className={`py-1.5 px-2 rounded-lg text-xs font-medium border transition-all ${
@@ -356,10 +374,14 @@ export default function Home() {
                 </div>
 
                 {/* 年收入 */}
-                {p.status === "employed" && (
+                {(p.status === "employed" || p.status === "maternity" || p.status === "sickleave") && (
                   <div>
                     <label className="text-xs text-gray-400">
-                      这段期间的税前年收入
+                      {p.status === "maternity"
+                        ? "休假前的税前年收入"
+                        : p.status === "sickleave"
+                        ? "休职前的税前年收入"
+                        : "这段期间的税前年收入"}
                     </label>
                     <div className="flex items-center gap-2 mt-1">
                       <input
@@ -505,6 +527,8 @@ export default function Home() {
             <p>* 学生特例期间算入资格但不算入领取额（除非追纳）</p>
             <p>* 免除期间领取额按一半计算（全额免除的情况）</p>
             <p>* 第3号（家庭主妇/主夫）不需缴纳但算入国民年金满额</p>
+            <p>* 产假/育休期间保费全免（公司和个人），但年金按休假前工资照算</p>
+            <p>* 病休/休职期间继续缴纳厚生年金，按休职前标准报酬月额计算</p>
             <p>* 60岁后到65岁的期间未计入（可选择任意加入）</p>
             <p>* 汇率按1日元≈0.049人民币估算</p>
             <p>* 本工具仅供参考，不构成任何财务建议</p>
