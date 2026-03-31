@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextRequest, NextResponse } from "next/server";
 import { PENSION_PARSE_SYSTEM, PENSION_SUGGEST_SYSTEM } from "../../lib/prompts/pension";
 import { TAX_SYSTEM } from "../../lib/prompts/tax";
+import { INSURANCE_SYSTEM } from "../../lib/prompts/insurance";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
@@ -52,12 +53,16 @@ export async function POST(req: NextRequest) {
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    // ─── Freeform domains (tax, etc.) ───
-    if (domain === "tax") {
+    // ─── Freeform domains ───
+    const freeformSystems: Record<string, string> = {
+      tax: TAX_SYSTEM,
+      insurance: INSURANCE_SYSTEM,
+    };
+    if (freeformSystems[domain]) {
       const history = buildGeminiHistory(messages.slice(0, -1));
       const chat = model.startChat({
         history,
-        systemInstruction: { role: "user", parts: [{ text: TAX_SYSTEM }] },
+        systemInstruction: { role: "user", parts: [{ text: freeformSystems[domain] }] },
       });
       const lastMessage = messages[messages.length - 1]?.content || "";
       const result = await chat.sendMessage(lastMessage);

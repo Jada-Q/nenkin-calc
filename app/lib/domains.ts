@@ -1,4 +1,4 @@
-export type DomainId = "pension" | "tax";
+export type DomainId = "pension" | "tax" | "insurance";
 
 export type Domain = {
   id: DomainId;
@@ -13,6 +13,26 @@ export type Domain = {
 };
 
 export const DOMAINS: Record<DomainId, Domain> = {
+  insurance: {
+    id: "insurance",
+    label: "保险相谈",
+    icon: "🛡️",
+    description: "公的保険・民間保険・外国人注意点",
+    chatMode: "freeform",
+    chips: [
+      "国保和健保有什么区别",
+      "高額療養費是什么",
+      "失业了保险怎么办",
+      "需要买医疗保险吗",
+      "生命保险需要吗",
+      "帰国前に保険解約",
+      "育休中的保险",
+      "保险料可以减税吗",
+    ],
+    welcomeTitle: "问我任何保险问题",
+    welcomeSubtitle: "公的保険・民間保険・外国人注意点 — FP2級監修",
+    placeholder: "我刚换工作，健保和国保怎么选，民间医疗保险还需要买吗...",
+  },
   pension: {
     id: "pension",
     label: "年金计算",
