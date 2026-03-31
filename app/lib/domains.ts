@@ -1,4 +1,4 @@
-export type DomainId = "pension" | "tax" | "insurance";
+export type DomainId = "pension" | "tax" | "insurance" | "realestate";
 
 export type Domain = {
   id: DomainId;
@@ -13,6 +13,26 @@ export type Domain = {
 };
 
 export const DOMAINS: Record<DomainId, Domain> = {
+  realestate: {
+    id: "realestate",
+    label: "不动产相谈",
+    icon: "🏠",
+    description: "买 vs 租、住宅贷款、外国人购房注意点",
+    chatMode: "freeform",
+    chips: [
+      "外国人能买房吗",
+      "买 vs 租怎么选",
+      "住宅ローン能贷多少",
+      "住宅ローン控除是什么",
+      "购房的诸费用有哪些",
+      "帰国したら物件どうする",
+      "マンションvs一戸建て",
+      "投资用不动产",
+    ],
+    welcomeTitle: "问我任何不动产问题",
+    welcomeSubtitle: "买房、贷款、外国人注意点 — FP2級監修",
+    placeholder: "我是永住者，想在东京买一套2LDK，预算5000万，怎么规划...",
+  },
   insurance: {
     id: "insurance",
     label: "保险相谈",

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { PENSION_PARSE_SYSTEM, PENSION_SUGGEST_SYSTEM } from "../../lib/prompts/pension";
 import { TAX_SYSTEM } from "../../lib/prompts/tax";
 import { INSURANCE_SYSTEM } from "../../lib/prompts/insurance";
+import { REALESTATE_SYSTEM } from "../../lib/prompts/realestate";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
@@ -57,6 +58,7 @@ export async function POST(req: NextRequest) {
     const freeformSystems: Record<string, string> = {
       tax: TAX_SYSTEM,
       insurance: INSURANCE_SYSTEM,
+      realestate: REALESTATE_SYSTEM,
     };
     if (freeformSystems[domain]) {
       const history = buildGeminiHistory(messages.slice(0, -1));
